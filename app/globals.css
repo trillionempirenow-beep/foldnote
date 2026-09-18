@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --color-paper: #f8f5f1;
+  --color-kraft: #d7c4a3;
+  --color-rose: #c97a7e;
+  --color-sage: #a7c7b7;
+  --color-lavender: #b6a5d8;
+  --color-ink: #3a312b;
+}
+
+@theme inline {
+  --color-paper: var(--color-paper);
+  --color-kraft: var(--color-kraft);
+  --color-rose: var(--color-rose);
+  --color-sage: var(--color-sage);
+  --color-lavender: var(--color-lavender);
+  --color-ink: var(--color-ink);
+
+  --font-caveat: var(--font-caveat);
+  --font-patrick: var(--font-patrick-hand);
+  --font-indie: var(--font-indie-flower);
+  --font-quicksand: var(--font-quicksand);
+  --font-nunito: var(--font-nunito);
+  --font-playfair: var(--font-playfair-display);
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-nunito), sans-serif;
+}
+
+/* Subtle cream paper grain, layered under every page */
+.paper-texture {
+  position: relative;
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(rgba(58, 49, 43, 0.035) 1px, transparent 1px),
+    radial-gradient(rgba(58, 49, 43, 0.025) 1px, transparent 1px);
+  background-size: 26px 26px, 18px 18px;
+  background-position: 0 0, 9px 9px;
+}
+
+/* A washi-tape strip, use with a rotation + position utility */
+.washi-tape {
+  position: absolute;
+  height: 1.75rem;
+  width: 4.5rem;
+  opacity: 0.85;
+  box-shadow: 0 1px 2px rgba(58, 49, 43, 0.15);
+}
+
+.washi-tape::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.35) 0,
+    rgba(255, 255, 255, 0.35) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* A soft, slightly imperfect drop shadow for scrapbook pieces */
+.paper-shadow {
+  box-shadow:
+    0 1px 2px rgba(58, 49, 43, 0.08),
+    0 8px 20px -8px rgba(58, 49, 43, 0.25);
+}
+
+.torn-edge-bottom {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='16' viewBox='0 0 400 16' preserveAspectRatio='none'%3E%3Cpath d='M0 0 L0 8 L10 4 L22 12 L35 3 L48 10 L61 2 L74 9 L88 4 L101 11 L114 3 L128 8 L141 2 L155 10 L168 4 L182 9 L196 2 L209 11 L223 3 L236 9 L250 4 L263 10 L277 2 L290 8 L304 3 L317 11 L330 4 L344 9 L357 2 L371 10 L384 3 L400 8 L400 0 Z' fill='black'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='16' viewBox='0 0 400 16' preserveAspectRatio='none'%3E%3Cpath d='M0 0 L0 8 L10 4 L22 12 L35 3 L48 10 L61 2 L74 9 L88 4 L101 11 L114 3 L128 8 L141 2 L155 10 L168 4 L182 9 L196 2 L209 11 L223 3 L236 9 L250 4 L263 10 L277 2 L290 8 L304 3 L317 11 L330 4 L344 9 L357 2 L371 10 L384 3 L400 8 L400 0 Z' fill='black'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-position: bottom;
+  mask-position: bottom;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
