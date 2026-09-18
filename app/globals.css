@@ -31,6 +31,33 @@ body {
   font-family: var(--font-nunito), sans-serif;
 }
 
+/* Custom scrollbar — reads the same palette tokens as everything else,
+   so it stays in sync if the theme colors ever change. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-kraft) 70%, var(--color-ink) 10%)
+    transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-kraft) 70%, var(--color-ink) 10%);
+  border-radius: 999px;
+  border: 2px solid var(--color-paper);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-rose) 55%, var(--color-kraft) 45%);
+}
+
 /* Subtle cream paper grain, layered under every page */
 .paper-texture {
   position: relative;

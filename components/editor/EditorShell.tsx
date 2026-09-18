@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type * as FabricNS from "fabric";
 import { createClient } from "@/lib/supabase/client";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/lib/types/editor";
-import type { EditorPage, EditorProject } from "@/lib/types/editor";
+import type {
+  EditorPage,
+  EditorProject,
+  StickerAsset,
+  BackgroundAsset,
+} from "@/lib/types/editor";
 import {
   DEFAULT_FONT_VAR,
   FONT_OPTIONS,
@@ -15,6 +20,7 @@ import { Toolbar } from "./Toolbar";
 import { BottomPages } from "./BottomPages";
 import { PropertyPanel, type SelectionInfo } from "./PropertyPanel";
 import { LayersPanel, type LayerEntry } from "./LayersPanel";
+import { AssetGrid } from "./AssetGrid";
 
 type SaveStatus = "saved" | "saving" | "unsaved";
 
@@ -40,9 +46,13 @@ export function EditorShell({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [selection, setSelection] = useState<SelectionInfo>(EMPTY_SELECTION);
   const [layers, setLayers] = useState<LayerEntry[]>([]);
-  const [layersOpen, setLayersOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<
+    "none" | "layers" | "stickers" | "backgrounds"
+  >("none");
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
   const [scale, setScale] = useState(1);
+  const [stickers, setStickers] = useState<StickerAsset[]>([]);
+  const [backgrounds, setBackgrounds] = useState<BackgroundAsset[]>([]);
 
   const stageWrapperRef = useRef<HTMLDivElement>(null);
   const canvasElRef = useRef<HTMLCanvasElement>(null);
@@ -74,6 +84,30 @@ export function EditorShell({
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Load the sticker/background libraries once. Both tables are public-read.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [{ data: stickerRows }, { data: bgRows }] = await Promise.all([
+        supabase
+          .from("stickers")
+          .select("id, name, category, asset_url, featured")
+          .order("category", { ascending: true }),
+        supabase
+          .from("backgrounds")
+          .select("id, name, collection, asset_url")
+          .order("collection", { ascending: true }),
+      ]);
+      if (cancelled) return;
+      if (stickerRows) setStickers(stickerRows as StickerAsset[]);
+      if (bgRows) setBackgrounds(bgRows as BackgroundAsset[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const rebuildLayers = useCallback((canvas: FabricNS.Canvas) => {
@@ -375,6 +409,55 @@ export function EditorShell({
     [supabase, project.id],
   );
 
+  const handleAddSticker = useCallback(
+    async (sticker: StickerAsset) => {
+      const canvas = fabricRef.current;
+      const mod = fabricModRef.current;
+      if (!canvas || !mod) return;
+      const img = await mod.FabricImage.fromURL(sticker.asset_url);
+      const targetSize = 96;
+      const s = targetSize / Math.max(img.width || targetSize, img.height || targetSize);
+      const jitter = () => Math.random() * 120 - 60;
+      img.set({
+        left: CANVAS_WIDTH / 2 - targetSize / 2 + jitter(),
+        top: CANVAS_HEIGHT / 2 - targetSize / 2 + jitter(),
+        scaleX: s,
+        scaleY: s,
+        angle: Math.random() * 16 - 8,
+      });
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.requestRenderAll();
+    },
+    [],
+  );
+
+  const handleSetBackground = useCallback(
+    async (bg: BackgroundAsset) => {
+      const canvas = fabricRef.current;
+      const mod = fabricModRef.current;
+      if (!canvas || !mod) return;
+      const img = await mod.FabricImage.fromURL(bg.asset_url);
+      img.set({
+        scaleX: CANVAS_WIDTH / (img.width || CANVAS_WIDTH),
+        scaleY: CANVAS_HEIGHT / (img.height || CANVAS_HEIGHT),
+        originX: "left",
+        originY: "top",
+        selectable: false,
+        evented: false,
+      });
+      canvas.set("backgroundImage", img);
+      canvas.requestRenderAll();
+      handleChange(canvas);
+      const pageId = activePageIdRef.current;
+      await supabase.from("pages").update({ background_id: bg.id }).eq("id", pageId);
+      setPages((prev) =>
+        prev.map((p) => (p.id === pageId ? { ...p, background_id: bg.id } : p)),
+      );
+    },
+    [handleChange, supabase],
+  );
+
   const handleConvertToPolaroid = useCallback(() => {
     const canvas = fabricRef.current;
     const mod = fabricModRef.current;
@@ -417,8 +500,18 @@ export function EditorShell({
       fill: "#3a312b",
       width: frameW - pad * 2,
     });
+    const tape = new mod.Rect({
+      left: frameW / 2 - 34,
+      top: -12,
+      width: 68,
+      height: 24,
+      fill: "#c97a7e",
+      opacity: 0.8,
+      angle: -4,
+      shadow: new mod.Shadow({ color: "rgba(58,49,43,0.25)", blur: 4, offsetY: 2 }),
+    });
 
-    const group = new mod.Group([frame, img, caption], { left, top, angle });
+    const group = new mod.Group([frame, img, caption, tape], { left, top, angle });
     canvas.add(group);
     canvas.setActiveObject(group);
     canvas.requestRenderAll();
@@ -620,8 +713,16 @@ export function EditorShell({
         <Toolbar
           onAddText={handleAddText}
           onAddImage={handleAddImage}
-          onToggleLayers={() => setLayersOpen((v) => !v)}
-          layersOpen={layersOpen}
+          onToggleLayers={() =>
+            setActivePanel((p) => (p === "layers" ? "none" : "layers"))
+          }
+          onToggleStickers={() =>
+            setActivePanel((p) => (p === "stickers" ? "none" : "stickers"))
+          }
+          onToggleBackgrounds={() =>
+            setActivePanel((p) => (p === "backgrounds" ? "none" : "backgrounds"))
+          }
+          activePanel={activePanel}
         />
 
         <div
@@ -670,7 +771,7 @@ export function EditorShell({
             onConvertToPolaroid={handleConvertToPolaroid}
           />
 
-          {layersOpen && (
+          {activePanel === "layers" && (
             <LayersPanel
               layers={layers}
               onSelect={(key) => {
@@ -689,6 +790,35 @@ export function EditorShell({
                 canvas.requestRenderAll();
                 handleChange(canvas);
               }}
+            />
+          )}
+
+          {activePanel === "stickers" && (
+            <AssetGrid
+              title="Stickers"
+              groups={Object.entries(
+                stickers.reduce<Record<string, StickerAsset[]>>((acc, s) => {
+                  (acc[s.category] ??= []).push(s);
+                  return acc;
+                }, {}),
+              ).map(([label, items]) => ({ label, items }))}
+              onPick={(item) => void handleAddSticker(item)}
+            />
+          )}
+
+          {activePanel === "backgrounds" && (
+            <AssetGrid
+              title="Backgrounds"
+              columns={2}
+              itemClassName="flex h-20 items-center justify-center overflow-hidden rounded-lg border border-ink/10 transition-transform hover:-translate-y-0.5 hover:border-rose/40"
+              groups={Object.entries(
+                backgrounds.reduce<Record<string, BackgroundAsset[]>>((acc, b) => {
+                  const key = b.collection || "Backgrounds";
+                  (acc[key] ??= []).push(b);
+                  return acc;
+                }, {}),
+              ).map(([label, items]) => ({ label, items }))}
+              onPick={(item) => void handleSetBackground(item)}
             />
           )}
         </div>
